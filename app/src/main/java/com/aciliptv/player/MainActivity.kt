@@ -19,12 +19,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.net.URL
 
 data class Channel(
@@ -37,6 +38,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContent {
             AcilIptvApp()
         }
@@ -52,21 +54,23 @@ class MainActivity : ComponentActivity() {
         var status by remember { mutableStateOf("أدخل رابط M3U للبدء") }
         var loading by remember { mutableStateOf(false) }
 
-        val player = remember {
+        val exoPlayer = remember {
             ExoPlayer.Builder(context).build()
         }
 
-        DisposableEffect(Unit) {
+        DisposableEffect(exoPlayer) {
             onDispose {
-                player.release()
+                exoPlayer.release()
             }
         }
 
         LaunchedEffect(selectedChannel) {
             selectedChannel?.let { channel ->
-                player.setMediaItem(MediaItem.fromUri(channel.streamUrl))
-                player.prepare()
-                player.playWhenReady = true
+                exoPlayer.setMediaItem(
+                    MediaItem.fromUri(channel.streamUrl)
+                )
+                exoPlayer.prepare()
+                exoPlayer.playWhenReady = true
             }
         }
 
@@ -96,7 +100,9 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.padding(bottom = 14.dp)
                 )
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     OutlinedTextField(
                         value = playlistUrl,
                         onValueChange = { playlistUrl = it },
@@ -120,6 +126,7 @@ class MainActivity : ComponentActivity() {
                                     }
 
                                     channels = loaded
+                                    selectedChannel = null
                                     status = "تم تحميل ${loaded.size} قناة"
 
                                 } catch (e: Exception) {
@@ -150,7 +157,7 @@ class MainActivity : ComponentActivity() {
                     AndroidView(
                         factory = { ctx ->
                             PlayerView(ctx).apply {
-                                player = this@MainActivity.let { player }
+                                player = exoPlayer
                                 useController = true
                             }
                         },
@@ -190,12 +197,15 @@ class MainActivity : ComponentActivity() {
                                 .padding(14.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(Modifier.weight(1f)) {
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
                                 Text(
                                     text = channel.name,
                                     color = Color.White,
                                     fontWeight = FontWeight.Medium
                                 )
+
                                 Text(
                                     text = channel.group,
                                     color = Color(0xFF9EACBD),
@@ -203,7 +213,10 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            Text("▶", color = Color(0xFF00D1B2))
+                            Text(
+                                "▶",
+                                color = Color(0xFF00D1B2)
+                            )
                         }
                     }
                 }
@@ -225,7 +238,7 @@ class MainActivity : ComponentActivity() {
                         .trim()
                         .ifBlank { "قناة" }
 
-                    group = Regex("""group-title="([^"]*)"""")
+                    group = Regex("group-title=\"([^\"]*)\"")
                         .find(line)
                         ?.groupValues
                         ?.getOrNull(1)
